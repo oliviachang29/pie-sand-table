@@ -20,8 +20,8 @@ const int MOTOR_STOP_TARGET = 2000;
 const int MOTOR_CW_TARGET = 2101; // slow clockwise
 const int MOTOR_CCW_TARGET = 1995; // slowest counterclockwise
 
-int currentRadius = 0;
-int currentAngle = 0;
+float currentRadius = 0;
+float currentAngle = 0;
 
 // one cycle = 464.64
 
@@ -42,8 +42,9 @@ void setup() {
 
   // motor setup
   Wire.begin();
+  angleMotor.stopMotor();
 
-  resetPosition();
+  //resetPosition();
 }
 
 void loop() {
@@ -54,16 +55,19 @@ void loop() {
 
 // maybe split between get encoder position and update angle
 void updateEncoderPosition() {
-  const long newEncoderPosition = angleEncoder.read();
+  const float newEncoderPosition = angleEncoder.read();
   // not sure why examples do it this way
   if (newEncoderPosition != encoderPosition) {
     encoderPosition = newEncoderPosition;
-    Serial.println("encoderPosition: ");
-    Serial.print(encoderPosition);
+    Serial.print("encoderPosition:");
+    Serial.println(encoderPosition);
+    Serial.print("currentAngle:");
+    Serial.println(currentAngle);
   }
 
   // TODO: convert encoder position to angle (based on number of ticks, might have to mess around)
-  currentAngle = 0;
+  // Assume number of ticks is 464
+  currentAngle = (encoderPosition % 464) * 360.0 / 464.0;
 }
 
 void setPosition(int radius, int theta) {
