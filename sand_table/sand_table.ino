@@ -7,9 +7,8 @@
 // PIN DEFINITIONS
 const int PIN_SERVO = 11;
 const int PIN_LIMIT_SWITCH = 8;
-const int PIN_ENCODER_CLK = 2;
-const int PIN_ENCODER_DT = 3;
-//#define PIN_ENCODER_SW = 4; // is this needed?
+const int PIN_ENCODER_CLK = 3;
+const int PIN_ENCODER_DT = 4;
 
 /************************** Variables ***********************************/
 
@@ -17,16 +16,16 @@ const int PIN_ENCODER_DT = 3;
 const int SERVO_MAX_POSITION = 0; // TODO: determine servo position that puts ball at edge of table
 const int SERVO_MIN_POSITION = 0; // TODO: determine servo position that puts ball in center
 
-// TODO: mess around with targets until we figure out which is CW and which is CCW
-const int MOTOR_STOP_TARGET = 0;
-const int MOTOR_CW_TARGET = 0;
-const int MOTOR_CCW_TARGET = 0;
+const int MOTOR_STOP_TARGET = 2000;
+const int MOTOR_CW_TARGET = 2101; // slow clockwise
+const int MOTOR_CCW_TARGET = 1995; // slowest counterclockwise
 
 int currentRadius = 0;
 int currentAngle = 0;
 
-// TODO this may want to be set somewhere else? or a constant?
-long encoderPosition  = -999;
+// one cycle = 464.64
+
+long encoderPosition;
 
 Servo radiusServo;
 Encoder angleEncoder(PIN_ENCODER_CLK, PIN_ENCODER_DT);
@@ -38,22 +37,17 @@ void setup() {
   Serial.begin(9600);
   Serial.println("Starting sketch...");
 
-  // TODO: do we need this?
-  // encoder switch pin
-//  pinMode(PIN_ENCODER_SW,INPUT_PULLUP);
-//  attachInterrupt(digitalPinToInterrupt(switchPin), handleSwitch, RISING);
-
   // servo setup
   radiusServo.attach(PIN_SERVO);
 
   // motor setup
-  Wire.begin(); // WARNING: are we using i2c?
+  Wire.begin();
 
   resetPosition();
 }
 
 void loop() {
-  
+  updateEncoderPosition();
 }
 
 /************************** Helpers ***********************************/
