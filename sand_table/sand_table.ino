@@ -2,6 +2,7 @@
 // LIBRARIES
 #include <JrkG2.h>
 #include <Servo.h>
+#include <Encoder.h>
 
 // PIN DEFINITIONS
 const int PIN_SERVO = 11;
@@ -79,7 +80,7 @@ void setPosition(int radius, int theta) {
 // radius: value from 0 (center) to 1 (max)
 void setRadius(float radius) {
   // convert radius value to servo value
-  const int servoPos = radius*(SERVO_MAX_POSITION - SERVO_PIN_POSITION) + SERVO_PIN_POSITION;
+  const int servoPos = radius*(SERVO_MAX_POSITION - SERVO_MIN_POSITION) + SERVO_MIN_POSITION;
   radiusServo.write(servoPos);
 
   // update position reading
