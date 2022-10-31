@@ -21,11 +21,11 @@ const int PIN_RADIUS_ENCODER_DT = 19;
 
 // CONSTANTS
 
-const int MOTOR_CW_TARGET = 2101; // slow clockwise
-const int MOTOR_CCW_TARGET = 1995; // slowest counterclockwise
-
 float currentRadius = 0;
 float currentAngle = 0;
+
+int angleMotorDefaultSpeed = 2;
+int radiusMotorDefaultSpeed = 2;
 
 // one cycle = 464.64
 
@@ -49,8 +49,8 @@ void setup() {
 
   // motor setup
   Wire.begin();
-  angleMotor.stopMotor();
-  radiusMotor.stopMotor();
+  angleMotor->setSpeed(0);
+  angleMotor->setSpeed(0);
 
   //resetPosition();
 }
@@ -94,10 +94,6 @@ void setPosition(float radius, int theta) {
 
 // radius: value from 0 (center) to 1 (max)
 void setRadius(float radius) {
-  // convert radius value to servo value
-  const int servoPos = radius*(SERVO_MAX_POSITION - SERVO_MIN_POSITION) + SERVO_MIN_POSITION;
-  radiusServo.write(servoPos);
-
   // update position reading
   currentRadius = radius;
 }
@@ -115,27 +111,33 @@ void setAngle(int newAngle) {
   }
   
   // move motor until encoder indicates that we have reached desired angle
-  
-  // WARNING: currentAngle may never actually equal newAngle, might need to do
-  // while (currentAngle - newAngle > 5) { // 5 is arbitrary
-
-  angleMotor.setTarget(shouldMoveCW ? MOTOR_CW_TARGET : MOTOR_CCW_TARGET); 
-  while (abs(currentAngle % 360 - newAngle % 360) > 1) {
+ 
+  // currently assuming clockwise is backward
+  if (shouldMoveCW) {
+    angleMotor->run(BACKWARD); 
+  }
+  else {
+    angleMotor->run(FORWARD);
+  }
+  angleMotor->setSpeed(angleMotorDefaultSpeed);
+  // checks if angle is within one degree of new angle
+  while (abs(int(currentAngle) % 360 - newAngle % 360) > 1) {
     updateEncoderPosition(); 
   }
   
-  angleMotor.stopMotor(); // stop motor
+  angleMotor->setSpeed(0); // stop motor
 }
 
 // reset to where the limit switch is, or the "0" position
 void resetPosition() {
   // move angleMotor CCW until it hits the limit switch, then stop
-  angleMotor.setTarget(MOTOR_CCW_TARGET);
+  angleMotor->run(FORWARD);
+  angleMotor->setSpeed(angleMotorDefaultSpeed);
   while (digitalRead(PIN_LIMIT_SWITCH) == LOW)
   {
     delay(100); // note: feels like a bad way to do this? can we use millis instead?
   }
-  angleMotor.stopMotor(); // stop motor
+  angleMotor->setSpeed(0); // stop motor
   updateEncoderPosition();
   // TODO: note current encoder position at 0 and maybe update something based on this?
 }
