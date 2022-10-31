@@ -1,20 +1,25 @@
 /************************** Configuration ***********************************/
 // LIBRARIES
+#include <Wire.h>
 #include <JrkG2.h>
-#include <Servo.h>
 #include <Encoder.h>
+#include <Adafruit_MotorShield.h>
+#include "utility/Adafruit_MS_PWMServoDriver.h"
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+Adafruit_DCMotor *angleMotor = AFMS.getMotor(1);
+Adafruit_DCMotor *radiusMotor = AFMS.getMotor(2);
 
 // PIN DEFINITIONS
-const int PIN_SERVO = 11;
 const int PIN_LIMIT_SWITCH = 8;
-const int PIN_ENCODER_CLK = 3;
-const int PIN_ENCODER_DT = 4;
+const int PIN_ANGLE_ENCODER_CLK = 3;
+const int PIN_ANGLE_ENCODER_DT = 4;
+const int PIN_RADIUS_ENCODER_CLK = 18;
+const int PIN_RADIUS_ENCODER_DT = 19;
 
 /************************** Variables ***********************************/
 
 // CONSTANTS
-const int SERVO_MAX_POSITION = 0; // TODO: determine servo position that puts ball at edge of table
-const int SERVO_MIN_POSITION = 0; // TODO: determine servo position that puts ball in center
 
 const int MOTOR_CW_TARGET = 2101; // slow clockwise
 const int MOTOR_CCW_TARGET = 1995; // slowest counterclockwise
@@ -24,28 +29,28 @@ float currentAngle = 0;
 
 // one cycle = 464.64
 
-long encoderPosition;
+long angleEncoderPosition;
 
 // angle (degrees) first, then radius (0 to 1)
 const int num_points = 5;
 float point_list[num_points][2] = {{0, 0.5}, {72, 0.5}, {144, 0.5}, {216, 0.5}, {288, 0.5}};
 
-Servo radiusServo;
-Encoder angleEncoder(PIN_ENCODER_CLK, PIN_ENCODER_DT);
-JrkG2I2C angleMotor;
+Encoder angleEncoder(PIN_ANGLE_ENCODER_CLK, PIN_ANGLE_ENCODER_DT);
+Encoder radiusEncoder(PIN_RADIUS_ENCODER_CLK, PIN_ANGLE_ENCODER_DT);
 
 /************************** Setup and Loop ***********************************/
 
 void setup() {
   Serial.begin(9600);
   Serial.println("Starting sketch...");
-
-  // servo setup
-  radiusServo.attach(PIN_SERVO);
+  
+  // motor shield setup
+  AFMS.begin();
 
   // motor setup
   Wire.begin();
   angleMotor.stopMotor();
+  radiusMotor.stopMotor();
 
   //resetPosition();
 }
@@ -67,19 +72,19 @@ void drawPattern() {
 
 // maybe split between get encoder position and update angle
 void updateEncoderPosition() {
-  const float newEncoderPosition = angleEncoder.read();
+  const float newAngleEncoderPosition = angleEncoder.read();
   // not sure why examples do it this way
-  if (newEncoderPosition != encoderPosition) {
-    encoderPosition = newEncoderPosition;
+  if (newAngleEncoderPosition != angleEncoderPosition) {
+    angleEncoderPosition = newAngleEncoderPosition;
     Serial.print("encoderPosition:");
-    Serial.println(encoderPosition);
+    Serial.println(angleEncoderPosition);
     Serial.print("currentAngle:");
     Serial.println(currentAngle);
   }
 
   // TODO: convert encoder position to angle (based on number of ticks, might have to mess around)
   // Assume number of ticks is 464
-  currentAngle = (encoderPosition % 464) * 360.0 / 464.0;
+  currentAngle = (angleEncoderPosition % 464) * 360.0 / 464.0;
 }
 
 void setPosition(float radius, int theta) {
