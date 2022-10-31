@@ -16,7 +16,6 @@ const int PIN_ENCODER_DT = 4;
 const int SERVO_MAX_POSITION = 0; // TODO: determine servo position that puts ball at edge of table
 const int SERVO_MIN_POSITION = 0; // TODO: determine servo position that puts ball in center
 
-const int MOTOR_STOP_TARGET = 2000;
 const int MOTOR_CW_TARGET = 2101; // slow clockwise
 const int MOTOR_CCW_TARGET = 1995; // slowest counterclockwise
 
@@ -26,6 +25,10 @@ float currentAngle = 0;
 // one cycle = 464.64
 
 long encoderPosition;
+
+// angle (degrees) first, then radius (0 to 1)
+const int num_points = 5;
+float point_list[num_points][2] = {{0, 0.5}, {72, 0.5}, {144, 0.5}, {216, 0.5}, {288, 0.5}};
 
 Servo radiusServo;
 Encoder angleEncoder(PIN_ENCODER_CLK, PIN_ENCODER_DT);
@@ -53,6 +56,15 @@ void loop() {
 
 /************************** Helpers ***********************************/
 
+void drawPattern() {
+  resetPosition();
+  for(int i=0; i < num_points; i++){
+    int next_angle = point_list[i][0];
+    int next_radius = point_list[i][1];
+    setPosition(next_radius, next_angle);
+  }
+}
+
 // maybe split between get encoder position and update angle
 void updateEncoderPosition() {
   const float newEncoderPosition = angleEncoder.read();
@@ -70,7 +82,7 @@ void updateEncoderPosition() {
   currentAngle = (encoderPosition % 464) * 360.0 / 464.0;
 }
 
-void setPosition(int radius, int theta) {
+void setPosition(float radius, int theta) {
   setAngle(theta);
   setRadius(radius);
 }
@@ -103,11 +115,11 @@ void setAngle(int newAngle) {
   // while (currentAngle - newAngle > 5) { // 5 is arbitrary
 
   angleMotor.setTarget(shouldMoveCW ? MOTOR_CW_TARGET : MOTOR_CCW_TARGET); 
-  while (currentAngle != newAngle) {
+  while (abs(currentAngle % 360 - newAngle % 360) > 1) {
     updateEncoderPosition(); 
   }
-
-  angleMotor.setTarget(MOTOR_STOP_TARGET); // stop motor
+  
+  angleMotor.stopMotor(); // stop motor
 }
 
 // reset to where the limit switch is, or the "0" position
@@ -118,7 +130,7 @@ void resetPosition() {
   {
     delay(100); // note: feels like a bad way to do this? can we use millis instead?
   }
-  angleMotor.setTarget(MOTOR_STOP_TARGET); // stop motor
+  angleMotor.stopMotor(); // stop motor
   updateEncoderPosition();
   // TODO: note current encoder position at 0 and maybe update something based on this?
 }
