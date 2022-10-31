@@ -21,6 +21,9 @@ const int PIN_RADIUS_ENCODER_DT = 19;
 
 // CONSTANTS
 
+const int MOTOR_CW_TARGET = 2101;  // slow clockwise
+const int MOTOR_CCW_TARGET = 1995; // slowest counterclockwise
+
 float currentRadius = 0;
 float currentAngle = 0;
 
@@ -30,6 +33,7 @@ int radiusMotorDefaultSpeed = 2;
 // one cycle = 464.64
 
 long angleEncoderPosition;
+long radiusEncoderPosition;
 
 // angle (degrees) first, then radius (0 to 1)
 const int num_points = 5;
@@ -40,10 +44,11 @@ Encoder radiusEncoder(PIN_RADIUS_ENCODER_CLK, PIN_ANGLE_ENCODER_DT);
 
 /************************** Setup and Loop ***********************************/
 
-void setup() {
+void setup()
+{
   Serial.begin(9600);
   Serial.println("Starting sketch...");
-  
+
   // motor shield setup
   AFMS.begin();
 
@@ -52,18 +57,21 @@ void setup() {
   angleMotor->setSpeed(0);
   angleMotor->setSpeed(0);
 
-  //resetPosition();
+  // resetPosition();
 }
 
-void loop() {
+void loop()
+{
   updateEncoderPosition();
 }
 
 /************************** Helpers ***********************************/
 
-void drawPattern() {
+void drawPattern()
+{
   resetPosition();
-  for(int i=0; i < num_points; i++){
+  for (int i = 0; i < num_points; i++)
+  {
     int next_angle = point_list[i][0];
     int next_radius = point_list[i][1];
     setPosition(next_radius, next_angle);
@@ -71,54 +79,82 @@ void drawPattern() {
 }
 
 // maybe split between get encoder position and update angle
-void updateEncoderPosition() {
+void updateEncoderPosition()
+{
   const float newAngleEncoderPosition = angleEncoder.read();
-  // not sure why examples do it this way
-  if (newAngleEncoderPosition != angleEncoderPosition) {
+  const float newRadiusEncoderPosition = radiusEncoder.read();
+
+  if (newAngleEncoderPosition != angleEncoderPosition)
+  {
     angleEncoderPosition = newAngleEncoderPosition;
-    Serial.print("encoderPosition:");
+    Serial.print("angleEncoderPosition:");
     Serial.println(angleEncoderPosition);
     Serial.print("currentAngle:");
     Serial.println(currentAngle);
   }
 
-  // TODO: convert encoder position to angle (based on number of ticks, might have to mess around)
+  if (newRadiusEncoderPosition != radiusEncoderPosition)
+  {
+    radiusEncoderPosition = newRadiusEncoderPosition;
+    Serial.print("radiusEncoderPosition:");
+    Serial.println(angleEncoderPosition);
+    Serial.print("currentRadius:");
+    Serial.println(currentAngle);
+  }
+
+  // convert angle encoder position to actual angle
   // Assume number of ticks is 464
   currentAngle = (angleEncoderPosition % 464) * 360.0 / 464.0;
+
+  // convert radius encoder position to actual radius
+  // incorrect for now
+  currentRadius = (radiusEncoderPosition % 464) * 2 * PI / 464.0 * 0; // need radius of pulley
 }
 
-void setPosition(float radius, int theta) {
+void setPosition(float radius, int theta)
+{
   setAngle(theta);
   setRadius(radius);
 }
 
 // radius: value from 0 (center) to 1 (max)
-void setRadius(float radius) {
-  // update position reading
-  currentRadius = radius;
+void setRadius(float newRadius)
+{
+  // determine direction to move DC motor
+  // TODO: will depend on assembly
+  radiusMotor->run(newRadius > currentRadius ? FORWARD : BACKARD);
+  radiusMotor->setSpeed(TODO_DEFAULT_SPEED);
+
+  while (currentRadius - newRadius > 1)
+  {
+
+    radiusMotor.setTarget(shouldMoveCW ? MOTOR_CW_TARGET : MOTOR_CCW_TARGET);
+    {
+      updateEncoderPosition();
+    }
+  }
 }
 
 // newAngle (in degrees)
-void setAngle(int newAngle) {
+void setAngle(int newAngle)
+{
   // determine direction to move DC motor
   boolean shouldMoveCW;
-  if (newAngle - currentAngle < 180) {
+  if (newAngle - currentAngle < 180)
+  {
     shouldMoveCW = newAngle > currentAngle;
-  } else {
+  }
+  else
+  {
     // account for scenario when it's faster to get to the new angle
     // by crossing over the 0 degree mark
     shouldMoveCW = newAngle < currentAngle;
   }
-  
+
   // move motor until encoder indicates that we have reached desired angle
  
   // currently assuming clockwise is backward
-  if (shouldMoveCW) {
-    angleMotor->run(BACKWARD); 
-  }
-  else {
-    angleMotor->run(FORWARD);
-  }
+  angleMotor->run(shouldMoveCW ? BACKWARD : FORWARD); 
   angleMotor->setSpeed(angleMotorDefaultSpeed);
   // checks if angle is within one degree of new angle
   while (abs(int(currentAngle) % 360 - newAngle % 360) > 1) {
@@ -129,7 +165,8 @@ void setAngle(int newAngle) {
 }
 
 // reset to where the limit switch is, or the "0" position
-void resetPosition() {
+void resetPosition()
+{
   // move angleMotor CCW until it hits the limit switch, then stop
   angleMotor->run(FORWARD);
   angleMotor->setSpeed(angleMotorDefaultSpeed);
