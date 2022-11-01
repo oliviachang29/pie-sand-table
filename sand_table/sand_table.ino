@@ -1,7 +1,6 @@
 /************************** Configuration ***********************************/
 // LIBRARIES
 #include <Wire.h>
-#include <JrkG2.h>
 #include <Encoder.h>
 #include <Adafruit_MotorShield.h>
 #include "utility/Adafruit_MS_PWMServoDriver.h"
@@ -14,18 +13,16 @@ Adafruit_DCMotor *radiusMotor = AFMS.getMotor(2);
 const int PIN_LIMIT_SWITCH = 8;
 const int PIN_ANGLE_ENCODER_CLK = 3;
 const int PIN_ANGLE_ENCODER_DT = 4;
-const int PIN_RADIUS_ENCODER_CLK = 2;
-const int PIN_RADIUS_ENCODER_DT = 1;
+const int PIN_RADIUS_ENCODER_CLK = 18;
+const int PIN_RADIUS_ENCODER_DT = 19;
 
 /************************** Variables ***********************************/
-
-// CONSTANTS
 
 float currentRadius = 0;
 float currentAngle = 0;
 
-int angleMotorDefaultSpeed = 100;
-int radiusMotorDefaultSpeed = 100;
+int angleMotorDefaultSpeed = 2;
+int radiusMotorDefaultSpeed = 2;
 
 // one cycle = 464.64
 
@@ -36,8 +33,8 @@ long radiusEncoderPosition;
 const int num_points = 5;
 float point_list[num_points][2] = {{0, 0.5}, {72, 0.5}, {144, 0.5}, {216, 0.5}, {288, 0.5}};
 
-//Encoder angleEncoder(PIN_ANGLE_ENCODER_CLK, PIN_ANGLE_ENCODER_DT);
-Encoder radiusEncoder(PIN_RADIUS_ENCODER_CLK, PIN_ANGLE_ENCODER_DT);
+Encoder angleEncoder(PIN_ANGLE_ENCODER_CLK, PIN_ANGLE_ENCODER_DT);
+Encoder radiusEncoder(PIN_RADIUS_ENCODER_CLK, PIN_RADIUS_ENCODER_DT);
 
 /************************** Setup and Loop ***********************************/
 
@@ -51,12 +48,10 @@ void setup()
 
   // motor setup
   Wire.begin();
-  angleMotor->run(FORWARD);
-  radiusMotor->run(FORWARD);
-  angleMotor->setSpeed(angleMotorDefaultSpeed);
-  radiusMotor->setSpeed(radiusMotorDefaultSpeed);
+  angleMotor->setSpeed(0);
+  angleMotor->setSpeed(0);
 
-  // resetPosition();
+  // resetPosition();  // can only be called when limit switch exists
 }
 
 void loop()
@@ -105,70 +100,72 @@ void updateEncoderPosition()
   // Assume number of ticks is 464
   currentAngle = (angleEncoderPosition % 464) * 360.0 / 464.0;
 
-  // convert radius encoder position to actual radius
+  // convert radius encoder position to actual radius (from 0 to 1)
   // incorrect for now
   currentRadius = (radiusEncoderPosition % 464) * 2 * PI / 464.0 * 0; // need radius of pulley
 }
 
-void setPosition(float radius, int theta)
-{
-  setAngle(theta);
-  setRadius(radius);
-}
-
-// radius: value from 0 (center) to 1 (max)
-void setRadius(float newRadius)
-{
-  // determine direction to move DC motor
+// newRadius: value from 0 (center) to 1 (max)
+// newAngle (in degrees)
+void setPosition(float newRadius, int newAngle) {
+  // Radius: determine direction to move radius motor
   // TODO: will depend on assembly
   radiusMotor->run(newRadius > currentRadius ? FORWARD : BACKWARD);
   radiusMotor->setSpeed(radiusMotorDefaultSpeed);
 
-  while (currentRadius - newRadius > 1){
-      updateEncoderPosition();
-  }
-}
-
-// newAngle (in degrees)
-void setAngle(int newAngle)
-{
-  // determine direction to move DC motor
+  // Angle: determine direction to move DC motor
   boolean shouldMoveCW;
-  if (newAngle - currentAngle < 180)
-  {
+  if (newAngle - currentAngle < 180) {
     shouldMoveCW = newAngle > currentAngle;
-  }
-  else
-  {
+  } else {
     // account for scenario when it's faster to get to the new angle
     // by crossing over the 0 degree mark
     shouldMoveCW = newAngle < currentAngle;
   }
-
   // move motor until encoder indicates that we have reached desired angle
- 
   // currently assuming clockwise is backward
   angleMotor->run(shouldMoveCW ? BACKWARD : FORWARD); 
   angleMotor->setSpeed(angleMotorDefaultSpeed);
-  // checks if angle is within one degree of new angle
-  while (abs(int(currentAngle) % 360 - newAngle % 360) > 1) {
-    updateEncoderPosition(); 
+
+
+  // combine angle and radius moving into one while loop so that angle and radius can change at the same time
+
+  // note: eventually we will probably want to adjust the speed, based on distance traveled
+  // so that we reach the correct angle and radius at the same time
+  while (abs(currentRadius - newRadius) > 1 || abs(int(currentAngle) % 360 - newAngle % 360) > 1)
+  {
+    updateEncoderPosition();
+    // stop radius motor once we reach correct radius
+    if (abs(currentRadius - newRadius) > 1) {
+      radiusMotor->setSpeed(0);
+    }
+
+    // stop angle motor once we reach correct angle
+    if (abs(int(currentAngle) % 360 - newAngle % 360) > 1) {
+      angleMotor->setSpeed(0);
+    }
   }
+  // be sure to stop both motors
+  radiusMotor->setSpeed(0);
+  angleMotor->setSpeed(0);
   
-  angleMotor->setSpeed(0); // stop motor
 }
+
 
 // reset to where the limit switch is, or the "0" position
 void resetPosition()
 {
   // move angleMotor CCW until it hits the limit switch, then stop
-  angleMotor->run(BACKWARD);
+  angleMotor->run(FORWARD);
   angleMotor->setSpeed(angleMotorDefaultSpeed);
   while (digitalRead(PIN_LIMIT_SWITCH) == LOW)
   {
     delay(100); // note: feels like a bad way to do this? can we use millis instead?
   }
   angleMotor->setSpeed(0); // stop motor
+  
+  // reset current encoder position to 0
+  angleEncoder.write(0);
+  radiusEncoder.write(0);
   updateEncoderPosition();
-  // TODO: note current encoder position at 0 and maybe update something based on this?
 }
