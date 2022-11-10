@@ -25,8 +25,8 @@ const int ANGLE_BUFFER = 15;
 float currentRadius = 0;
 float currentAngle = 0;
 
-int angleMotorDefaultSpeed = 70;
-int radiusMotorDefaultSpeed = 80;
+int angleMotorDefaultSpeed = 100;
+int radiusMotorDefaultSpeed = 150;
 
 bool angleMotorForward = true;
 bool radiusMotorForward = true;
@@ -75,14 +75,14 @@ void loop()
   
   if(theta < endTheta){
     theta = theta + dtheta;
-    rad = calculateRadius(theta, 0);
+    rad = calculateRadius(theta, 20);
     Serial.print(rad);
     Serial.print(", ");
     Serial.println(theta);
     setPosition(rad, theta);
     delay(100);
   } else {
-    Serial.println("Path complete")
+    Serial.println("Path complete");
   }
   
   /*
@@ -110,7 +110,7 @@ void debugAngle() {
   // run motor if input is "g"
     if (input == 103) {
       angleMotor->run(angleMotorForward ? FORWARD : BACKWARD);
-      angleMotor->setSpeed(70);
+      angleMotor->setSpeed(angleMotorDefaultSpeed);
     }
     // stop motors if input is "s"
     else if (input == 115) {
@@ -132,7 +132,7 @@ void debugRadius() {
   // run motor if input is "g"
     if (input == 103) {
       radiusMotor->run(radiusMotorForward ? FORWARD : BACKWARD);
-      radiusMotor->setSpeed(60);
+      radiusMotor->setSpeed(radiusMotorDefaultSpeed);
     }
     // stop motors if input is "s"
     else if (input == 115) {
@@ -161,7 +161,7 @@ void drawPattern() {
 float calculateRadius(float theta, int type) {
   // if k = 1, 150/2pi = ~23 which means it will take 23 times to fully go around
   const float k = 3; // TODO figure out k
-  const float radius;
+  float radius;
 
   switch (type) {
     case 0:
@@ -202,7 +202,7 @@ void setPosition(float newRadius, float newAngle) {
   // make sure that newRadius and newAngle is within min/max
   if (newRadius < 0){
     newAngle = newAngle+PI;
-    newRadius = abs(newRadius)
+    newRadius = abs(newRadius);
   }
   Serial.print("SET POSITION: newRadius: ");
   Serial.print(newRadius);
@@ -242,8 +242,8 @@ void setPosition(float newRadius, float newAngle) {
     Serial.print("Target: ");
     Serial.print(newRadiusEnc);
     Serial.print(", ");
-    Serial.println(newAngleEnc);
-    Serial.print("Current: ");
+    Serial.print(newAngleEnc);
+    Serial.print("   Current: ");
     Serial.print(radiusEncoder.read());
     Serial.print(", ");
     Serial.println(angleEncoder.read());
