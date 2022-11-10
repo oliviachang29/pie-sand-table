@@ -63,19 +63,28 @@ void setup()
 }
 
 float theta = 0;
+float endTheta = 2*2*PI;
 float rad = 0;
+float dtheta = 2*PI/100;
 
 void loop()
 {
+  // uncomment to debug motor speeds/directions
   //debugRadius();
   //debugAngle();
   
-  theta = theta + PI/2;
-  Serial.print(rad);
-  Serial.print(", ");
-  Serial.println(theta);
-  setPosition(rad, theta);
-  delay(1000);
+  if(theta < endTheta){
+    theta = theta + dtheta;
+    rad = calculateRadius(theta, 0);
+    Serial.print(rad);
+    Serial.print(", ");
+    Serial.println(theta);
+    setPosition(rad, theta);
+    delay(100);
+  } else {
+    Serial.println("Path complete")
+  }
+  
   /*
   setPosition(0, 0);
   delay(1000);
@@ -147,9 +156,54 @@ void drawPattern() {
   }
 }
 
-// newRadius: value from 0 (center) to 1 (max)
-// newAngle (in degrees)
+// radius ranges from 0 to 150 mm
+// 
+float calculateRadius(float theta, int type) {
+  // if k = 1, 150/2pi = ~23 which means it will take 23 times to fully go around
+  const float k = 3; // TODO figure out k
+  const float radius;
+
+  switch (type) {
+    case 0:
+      radius = spiral(theta);
+      break;
+    case 1:
+      radius = rose(theta);
+      break;
+    default:
+      radius = 10; // circle; don't change radius based on 
+      break;
+  }
+  
+  // eventually determine radius based on desired pattern
+  Serial.print("Theta: ");
+  Serial.println(theta);
+  Serial.print(", Radius: ");
+  Serial.println(radius);
+
+  return radius;
+}
+
+float spiral(float theta) {
+  const float k = 3; // TODO figure out k
+  return theta * k;
+}
+
+float rose(float theta) {
+  // TODO figure out a and b
+  const float a = 50;
+  const float b = 2; // eventually be able to pass in values
+  return a * abs(cos(b * theta));
+}
+
+// newRadius, in mm
+// newAngle, in radians
 void setPosition(float newRadius, float newAngle) {
+  // make sure that newRadius and newAngle is within min/max
+  if (newRadius < 0){
+    newAngle = newAngle+PI;
+    newRadius = abs(newRadius)
+  }
   Serial.print("SET POSITION: newRadius: ");
   Serial.print(newRadius);
   Serial.print(", newAngle:");
