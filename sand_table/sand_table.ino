@@ -25,8 +25,20 @@ const int ANGLE_BUFFER = 15;
 float currentRadius = 0;
 float currentAngle = 0;
 
-int angleMotorDefaultSpeed = 100;
-int radiusMotorDefaultSpeed = 150;
+int angleMotorDefaultSpeed = 40;
+int radiusMotorDefaultSpeed = 100;
+
+int angleMotorDecreaseSpeed = 25;
+int radiusMotorDecreaseSpeed = 70;
+
+const int POINTS_RESOLUTION = 40;
+const int ENCODER_THRESHOLD = 30;
+const int NUM_STEPS = 20;
+
+float theta = 0;
+float rad = 0;
+float endTheta = NUM_STEPS*2*PI/POINTS_RESOLUTION;
+float dtheta = 2*PI/POINTS_RESOLUTION;
 
 bool angleMotorForward = true;
 bool radiusMotorForward = true;
@@ -62,29 +74,31 @@ void setup()
   // resetPosition();  // can only be called when limit switch exists
 }
 
-float theta = 0;
-float endTheta = 2*2*PI;
-float rad = 0;
-float dtheta = 2*PI/100;
-
 void loop()
 {
   // uncomment to debug motor speeds/directions
-  //debugRadius();
-  //debugAngle();
+//  debugRadius();
+//  debugAngle();
+//  
+ if(theta < endTheta){
+   theta = theta + dtheta;
+   rad = calculateRadius(theta, 2000);
+   Serial.print(rad);
+   Serial.print(", ");
+   Serial.println(theta);
+   setPosition(rad, theta);
+   delay(100);
+ } else {
+   Serial.println("Path complete");
+ }
   
-  if(theta < endTheta){
-    theta = theta + dtheta;
-    rad = calculateRadius(theta, 20);
-    Serial.print(rad);
-    Serial.print(", ");
-    Serial.println(theta);
-    setPosition(rad, theta);
-    delay(100);
-  } else {
-    Serial.println("Path complete");
-  }
-  
+  // int counter = 0;
+  // while (counter < 360) {
+  //   setPosition(10.00, counter);
+  //   counter = counter + 10;
+  // }
+  // counter = 0;
+
   /*
   setPosition(0, 0);
   delay(1000);
@@ -108,20 +122,21 @@ void debugAngle() {
     input = Serial.read();
   }
   // run motor if input is "g"
-    if (input == 103) {
-      angleMotor->run(angleMotorForward ? FORWARD : BACKWARD);
-      angleMotor->setSpeed(angleMotorDefaultSpeed);
-    }
-    // stop motors if input is "s"
-    else if (input == 115) {
-      angleMotor->setSpeed(0);
-    }
-    // reverse motor direction if input is "r"
-    else if (input == 114) {
-      angleMotorForward = !angleMotorForward;
-      angleMotor->run(angleMotorForward ? FORWARD : BACKWARD);
-    }
-    Serial.println(angleEncoder.read());
+  if (input == 103) {
+    angleMotor->run(angleMotorForward ? FORWARD : BACKWARD);
+    angleMotor->setSpeed(angleMotorDefaultSpeed);
+  }
+  // stop motors if input is "s"
+  else if (input == 115) {
+    angleMotor->setSpeed(0);
+    Serial.println("STOP - angle");
+  }
+  // reverse motor direction if input is "r"
+  else if (input == 114) {
+    angleMotorForward = !angleMotorForward;
+    angleMotor->run(angleMotorForward ? FORWARD : BACKWARD);
+  }
+  Serial.println(angleEncoder.read());
 }
 
 void debugRadius() {
@@ -130,19 +145,20 @@ void debugRadius() {
     input = Serial.read();
   }
   // run motor if input is "g"
-    if (input == 103) {
-      radiusMotor->run(radiusMotorForward ? FORWARD : BACKWARD);
-      radiusMotor->setSpeed(radiusMotorDefaultSpeed);
-    }
-    // stop motors if input is "s"
-    else if (input == 115) {
-      radiusMotor->setSpeed(0);
-    }
-    // reverse motor direction if input is "r"
-    else if (input == 114) {
-      radiusMotorForward = !radiusMotorForward;
-      radiusMotor->run(radiusMotorForward ? FORWARD : BACKWARD);
-    }
+  if (input == 103) {
+    radiusMotor->run(radiusMotorForward ? FORWARD : BACKWARD);
+    radiusMotor->setSpeed(radiusMotorDefaultSpeed);
+  }
+  // stop motors if input is "s"
+  else if (input == 115) {
+    radiusMotor->setSpeed(0);
+    Serial.println("STOP - radius");
+  }
+  // reverse motor direction if input is "r"
+  else if (input == 114) {
+    radiusMotorForward = !radiusMotorForward;
+    radiusMotor->run(radiusMotorForward ? FORWARD : BACKWARD);
+  }
     
   Serial.println(radiusEncoder.read());
 }
@@ -237,28 +253,35 @@ void setPosition(float newRadius, float newAngle) {
   // so that we reach the correct angle and radius at the same time
   int radiusDone = 0;
   int angleDone = 0;
+
   while (radiusDone == 0 || angleDone == 0)
   {
-    Serial.print("Target: ");
-    Serial.print(newRadiusEnc);
-    Serial.print(", ");
-    Serial.print(newAngleEnc);
-    Serial.print("   Current: ");
-    Serial.print(radiusEncoder.read());
-    Serial.print(", ");
-    Serial.println(angleEncoder.read());
     // stop radius motor once we reach correct radius
     if (radiusDone == 0 && ((radiusStartDiff >= 0 && newRadiusEnc <= radiusEncoder.read()) || (radiusStartDiff <= 0 && newRadiusEnc >= radiusEncoder.read()))) {
-      Serial.println("reached correct radius");
       radiusMotor->setSpeed(0);
       radiusDone = 1;
+    } else if (radiusDone == 0 && ((radiusStartDiff >= 0 && newRadiusEnc <= radiusEncoder.read()+ENCODER_THRESHOLD) || (radiusStartDiff <= 0 && newRadiusEnc >= radiusEncoder.read()-ENCODER_THRESHOLD))) {
+      radiusMotor->setSpeed(radiusMotorDecreaseSpeed);
     }
 
     // stop angle motor once we reach correct angle
     if (angleDone == 0 && ((angleStartDiff >= 0 && newAngleEnc <= angleEncoder.read()) || (angleStartDiff <= 0 && newAngleEnc >= angleEncoder.read()))) {
-      Serial.println("reached correct angle");
       angleMotor->setSpeed(0);
       angleDone = 1;
+    }else if (angleDone == 0 && ((angleStartDiff >= 0 && newAngleEnc <= angleEncoder.read()+ENCODER_THRESHOLD) || (angleStartDiff <= 0 && newAngleEnc >= angleEncoder.read()-ENCODER_THRESHOLD))) {
+      angleMotor->setSpeed(angleMotorDecreaseSpeed);
+
+    }
+    
+    if (!radiusDone || !angleDone) {
+      Serial.print("Target: ");
+      Serial.print(newRadiusEnc);
+      Serial.print(", ");
+      Serial.print(newAngleEnc);
+      Serial.print("   Current: ");
+      Serial.print(radiusEncoder.read());
+      Serial.print(", ");
+      Serial.println(angleEncoder.read());
     }
   }
   // be sure to stop both motors
