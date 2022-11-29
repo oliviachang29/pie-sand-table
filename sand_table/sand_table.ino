@@ -7,7 +7,7 @@
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 Adafruit_DCMotor *angleMotor = AFMS.getMotor(1);
-Adafruit_DCMotor *radiusMotor = AFMS.getMotor(2);
+Adafruit_DCMotor *radiusMotor = AFMS.getMotor(3);
 
 // PIN DEFINITIONS
 const int PIN_LIMIT_SWITCH = 8;
@@ -48,11 +48,6 @@ bool radiusMotorForward = true;
 long angleEncoderPosition;
 long radiusEncoderPosition;
 
-// angle (degrees) first, then radius (0 to 1)
-const int num_points = 2;
-float point_list[num_points][2] = {{0, 0}, {50, 72}};
-//float point_list[num_points][2] = {{0, 0}, {72, 0}, {144, 0}, {216, 0}, {288, 0}};
-
 Encoder angleEncoder(PIN_ANGLE_ENCODER_CLK, PIN_ANGLE_ENCODER_DT);
 Encoder radiusEncoder(PIN_RADIUS_ENCODER_CLK, PIN_RADIUS_ENCODER_DT);
 
@@ -66,52 +61,38 @@ void setup()
   // motor shield setup
   AFMS.begin();
 
-  // motor setup
-  Wire.begin();
-  angleMotor->setSpeed(0);
-  radiusMotor->setSpeed(0);
+   angleMotor->setSpeed(0);
+   radiusMotor->setSpeed(0);
+// set constant speed for angle
 
-  // resetPosition();  // can only be called when limit switch exists
+//  angleMotor->run(FORWARD);
+//  radiusMotor->run(FORWARD);
+//  angleMotor->setSpeed(40);
+//  radiusMotor->setSpeed(60);
+//  
 }
 
 void loop()
 {
-  // uncomment to debug motor speeds/directions
-//  debugRadius();
-//  debugAngle();
-//  
- if(theta < endTheta){
-   theta = theta + dtheta;
-   rad = calculateRadius(theta, 2000);
-   Serial.print(rad);
-   Serial.print(", ");
-   Serial.println(theta);
-   setPosition(rad, theta);
-   delay(100);
- } else {
-   Serial.println("Path complete");
- }
+//  delay(1000);
+  debugRadius();
   
-  // int counter = 0;
-  // while (counter < 360) {
-  //   setPosition(10.00, counter);
-  //   counter = counter + 10;
-  // }
-  // counter = 0;
+}
 
-  /*
-  setPosition(0, 0);
-  delay(1000);
-  setPosition(550, 0);
-  delay(1000);
-  setPosition(1100, 0);
-  delay(1000);
-  setPosition(1650, 0);
-  delay(1000);
-  setPosition(2200, 0);
-  delay(1000);
-  updateEncoderPosition();
-  */
+
+// radius ranges from 0 to 150 mm
+// if k = 1, 150/2pi = ~23 which means it will take 23 times to fully go around
+
+void spiral() {
+
+}
+
+void circle() {
+  
+}
+
+void rose() {
+  
 }
 
 /************************** Helpers ***********************************/
@@ -161,153 +142,4 @@ void debugRadius() {
   }
     
   Serial.println(radiusEncoder.read());
-}
-
-void drawPattern() {
-  for (int i = 0; i < num_points; i++)
-  {
-    int next_radius = point_list[i][0];
-    int next_angle = point_list[i][1];
-    setPosition(next_radius, next_angle);
-  }
-}
-
-// radius ranges from 0 to 150 mm
-// 
-float calculateRadius(float theta, int type) {
-  // if k = 1, 150/2pi = ~23 which means it will take 23 times to fully go around
-  const float k = 3; // TODO figure out k
-  float radius;
-
-  switch (type) {
-    case 0:
-      radius = spiral(theta);
-      break;
-    case 1:
-      radius = rose(theta);
-      break;
-    default:
-      radius = 10; // circle; don't change radius based on 
-      break;
-  }
-  
-  // eventually determine radius based on desired pattern
-  Serial.print("Theta: ");
-  Serial.println(theta);
-  Serial.print(", Radius: ");
-  Serial.println(radius);
-
-  return radius;
-}
-
-float spiral(float theta) {
-  const float k = 3; // TODO figure out k
-  return theta * k;
-}
-
-float rose(float theta) {
-  // TODO figure out a and b
-  const float a = 50;
-  const float b = 2; // eventually be able to pass in values
-  return a * abs(cos(b * theta));
-}
-
-// newRadius, in mm
-// newAngle, in radians
-void setPosition(float newRadius, float newAngle) {
-  // make sure that newRadius and newAngle is within min/max
-  if (newRadius < 0){
-    newAngle = newAngle+PI;
-    newRadius = abs(newRadius);
-  }
-  Serial.print("SET POSITION: newRadius: ");
-  Serial.print(newRadius);
-  Serial.print(", newAngle:");
-  Serial.println(newAngle);
-  
-  int newAngleEnc = ANGLE_ENCODER_NUM_TICKS_IN_CYCLE/(2*PI) * (newAngle);
-  int newRadiusEnc = RADIUS_ENCODER_NUM_TICKS_IN_CYCLE/(2*PI) * (newRadius/(2*PI*32) - newAngle);
-
-  Serial.print(newRadiusEnc);
-  Serial.print(", ");
-  Serial.println(newAngleEnc);
-  
-  Serial.print(radiusEncoder.read());
-  Serial.print(", ");
-  Serial.println(angleEncoder.read());
-  
-  // Radius: determine direction to move radius motor
-  // TODO: will depend on assembly
-  radiusMotor->setSpeed(radiusMotorDefaultSpeed);
-  radiusMotor->run(newRadiusEnc > radiusEncoder.read() ? FORWARD : BACKWARD);
-  int radiusStartDiff = newRadiusEnc - radiusEncoder.read();
-
-  // move motor until encoder indicates that we have reached desired angle
-  angleMotor->setSpeed(angleMotorDefaultSpeed);
-  angleMotor->run(newAngleEnc > angleEncoder.read() ? BACKWARD : FORWARD);
-  int angleStartDiff = newAngleEnc - angleEncoder.read();
-
-  // combine angle and radius moving into one while loop so that angle and radius can change at the same time
-
-  // note: eventually we will probably want to adjust the speed, based on distance traveled
-  // so that we reach the correct angle and radius at the same time
-  int radiusDone = 0;
-  int angleDone = 0;
-
-  while (radiusDone == 0 || angleDone == 0)
-  {
-    // stop radius motor once we reach correct radius
-    if (radiusDone == 0 && ((radiusStartDiff >= 0 && newRadiusEnc <= radiusEncoder.read()) || (radiusStartDiff <= 0 && newRadiusEnc >= radiusEncoder.read()))) {
-      radiusMotor->setSpeed(0);
-      radiusDone = 1;
-    } else if (radiusDone == 0 && ((radiusStartDiff >= 0 && newRadiusEnc <= radiusEncoder.read()+ENCODER_THRESHOLD) || (radiusStartDiff <= 0 && newRadiusEnc >= radiusEncoder.read()-ENCODER_THRESHOLD))) {
-      radiusMotor->setSpeed(radiusMotorDecreaseSpeed);
-    }
-
-    // stop angle motor once we reach correct angle
-    if (angleDone == 0 && ((angleStartDiff >= 0 && newAngleEnc <= angleEncoder.read()) || (angleStartDiff <= 0 && newAngleEnc >= angleEncoder.read()))) {
-      angleMotor->setSpeed(0);
-      angleDone = 1;
-    }else if (angleDone == 0 && ((angleStartDiff >= 0 && newAngleEnc <= angleEncoder.read()+ENCODER_THRESHOLD) || (angleStartDiff <= 0 && newAngleEnc >= angleEncoder.read()-ENCODER_THRESHOLD))) {
-      angleMotor->setSpeed(angleMotorDecreaseSpeed);
-
-    }
-    
-    if (!radiusDone || !angleDone) {
-      Serial.print("Target: ");
-      Serial.print(newRadiusEnc);
-      Serial.print(", ");
-      Serial.print(newAngleEnc);
-      Serial.print("   Current: ");
-      Serial.print(radiusEncoder.read());
-      Serial.print(", ");
-      Serial.println(angleEncoder.read());
-    }
-  }
-  // be sure to stop both motors
-  radiusMotor->setSpeed(0);
-  angleMotor->setSpeed(0);
-  
-}
-
-
-// reset to where the limit switch is, or the "0" position
-void resetPosition()
-{
-  angleEncoderPosition = 0;
-  radiusEncoderPosition = 0;
-  // none of this works until limit switch exists
-  // // move angleMotor CCW until it hits the limit switch, then stop
-  // angleMotor->run(FORWARD);
-  // angleMotor->setSpeed(angleMotorDefaultSpeed);
-  // while (digitalRead(PIN_LIMIT_SWITCH) == LOW)
-  // {
-  //   delay(100); // note: feels like a bad way to do this? can we use millis instead?
-  // }
-  // angleMotor->setSpeed(0); // stop motor
-  
-  // // reset current encoder position to 0
-  // angleEncoder.write(0);
-  // radiusEncoder.write(0);
-  // updateEncoderPosition();
 }
