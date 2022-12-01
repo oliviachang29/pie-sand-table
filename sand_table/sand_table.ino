@@ -3,11 +3,7 @@
 #include <Wire.h>
 #include <Encoder.h>
 #include <Adafruit_MotorShield.h>
-#include "utility/Adafruit_MS_PWMServoDriver.h"
-
-Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-Adafruit_DCMotor *angleMotor = AFMS.getMotor(1);
-Adafruit_DCMotor *radiusMotor = AFMS.getMotor(3);
+#include "utility/Adafruit_PWMServoDriver.h"
 
 // PIN DEFINITIONS
 const int PIN_LIMIT_SWITCH = 8;
@@ -19,8 +15,15 @@ const int PIN_RADIUS_ENCODER_DT = 19;
 const float ANGLE_ENCODER_NUM_TICKS_IN_CYCLE = 1160.0;
 const float RADIUS_ENCODER_NUM_TICKS_IN_CYCLE = 2400;
 const int ANGLE_BUFFER = 15;
+const int STEPS_PER_REVOLUTION = 200; // figure out
 
 /************************** Variables ***********************************/
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+Adafruit_StepperMotor *angleMotor = AFMS.getStepper(STEPS_PER_REVOLUTION, 2);
+
+Adafruit_DCMotor *angleMotor = AFMS.getMotor(1);
+Adafruit_DCMotor *radiusMotor = AFMS.getMotor(3);
 
 float currentRadius = 0;
 float currentAngle = 0;
@@ -72,26 +75,7 @@ void setup()
 //  
 }
 
-void loop()
-{
-//  delay(1000);
-  debugRadius();
-  
-}
-
-
-// radius ranges from 0 to 150 mm
-// if k = 1, 150/2pi = ~23 which means it will take 23 times to fully go around
-
-void spiral() {
-
-}
-
-void circle() {
-  
-}
-
-void rose() {
+void loop() {
   
 }
 
@@ -109,13 +93,11 @@ void debugAngle() {
   }
   // stop motors if input is "s"
   else if (input == 115) {
-    angleMotor->setSpeed(0);
-    Serial.println("STOP - angle");
+    
   }
   // reverse motor direction if input is "r"
   else if (input == 114) {
-    angleMotorForward = !angleMotorForward;
-    angleMotor->run(angleMotorForward ? FORWARD : BACKWARD);
+    
   }
   Serial.println(angleEncoder.read());
 }
@@ -127,18 +109,15 @@ void debugRadius() {
   }
   // run motor if input is "g"
   if (input == 103) {
-    radiusMotor->run(radiusMotorForward ? FORWARD : BACKWARD);
-    radiusMotor->setSpeed(radiusMotorDefaultSpeed);
+    
   }
   // stop motors if input is "s"
   else if (input == 115) {
-    radiusMotor->setSpeed(0);
-    Serial.println("STOP - radius");
+    
   }
   // reverse motor direction if input is "r"
   else if (input == 114) {
-    radiusMotorForward = !radiusMotorForward;
-    radiusMotor->run(radiusMotorForward ? FORWARD : BACKWARD);
+    
   }
     
   Serial.println(radiusEncoder.read());
