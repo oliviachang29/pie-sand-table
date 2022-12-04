@@ -7,13 +7,25 @@
 #include <FastLED.h>
 
 /************************** Variables ***********************************/
+#define LED_PIN 8 // TODO change
+#define NUM_LEDS 41 // TODO 
+const int INITIAL_BRIGHTNESS = 128; // max brightness is 256
+
+
+CRGB leds[NUM_LEDS];
+CHSV currentColor( 0, 255, INITIAL_BRIGHTNESS);
 
 const int STEPS_PER_REVOLUTION = 200;
 
 const int ANGLE_MOTOR_DEFAULT_SPEED = STEPS_PER_REVOLUTION / 2;
 const int RADIUS_MOTOR_DEFAULT_SPEED = STEPS_PER_REVOLUTION / 2;
 
-/************************** Variables ***********************************/
+const int ledsCounter = 0;
+
+const int NUM_CIRCLE_POINTS = 5;
+// in radius, angle (deg)
+float point_list[NUM_CIRCLE_POINTS][5] = {{1, 0}, {1, 72}, {1, 144}, {1, 216}, {1, 288}};
+
 float currentRadius = 0;
 float currentAngle = 0;
 
@@ -38,66 +50,104 @@ void setup()
 {
   Serial.begin(9600);
   Serial.println("Starting sketch...");
-  
+
+  // STEPPERS
   // Configure each stepper
-  // todo make them constant
-  angleStepper.setMaxSpeed(500);
-  radiusStepper.setMaxSpeed(500);
+  // todo make them constant and figure out ideal max speeds
+  angleStepper.setMaxSpeed(300);
+  radiusStepper.setMaxSpeed(300);
   
   // use MultiStepper to manage both steppers
-  steppers.addStepper(angleStepper);
+  // IMPORTANT: radius stepper needs to be added before angle
+  // so that steppers.moveTo(position) accepts (r, angle) in that order
   steppers.addStepper(radiusStepper);
+  steppers.addStepper(angleStepper);
+
+  // reset stepper position
+  setPosition(0, 0);
+
+  // LEDs
+  FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
+  ledsClearAll();
 }
 
-void loop() {
-  /*
-  // just moving back and forth
-  // Change direction at the limits
-  if (angleStepper.distanceToGo() == 0) {
-    angleStepper.moveTo(-angleStepper.currentPosition()); 
-  }
-  if (radiusStepper.distanceToGo() == 0) {
-    radiusStepper.moveTo(-radiusStepper.currentPosition()); 
-  }
-  
-  angleStepper.runSpeed();
-  radiusStepper.runSpeed();
-  
-  Serial.print("angle: ");
-  Serial.print(angleStepper.currentPosition());
-  Serial.print("  radius: ");
-  Serial.println(radiusStepper.currentPosition());
-  */
+void ledsClearAll()
+{
+  FastLED.clear();
+  FastLED.show();
+}
 
-  long positions[2]; // Array of desired stepper positions
+void ledsDisplayColor(color) {
+  fill_solid(leds, NUM_LEDS, color);
+  FastLED.show();
+}
 
-  Serial.println("pos 1");
-  positions[0] = 1000;
-  positions[1] = 50;
-  steppers.moveTo(positions);
-  steppers.runSpeedToPosition(); // Blocks until all are in position
+
+// TODO this is only to test! remove me
+void testPositionMovement() {
+  Serial.println("running to pos 1 (1000, 50)");
+  steppers.moveTo({1000, 50});
+  steppers.runSpeedToPosition();
   delay(1000);
 
-  // Move to a different coordinate
-  Serial.println("pos 2");
+  Serial.println("running to pos 2 (-100, 100)");
+  long positions[2];
   positions[0] = -100;
   positions[1] = 100;
   steppers.moveTo(positions);
-  steppers.runSpeedToPosition(); // Blocks until all are in position
+  steppers.runSpeedToPosition();
   delay(1000);
+}
+
+void loop() {
+//  testPositionMovement();
+
+  setPosition(0, 0);
+  setPosition(0, 72);
+  setPosition(0, 144);
+  setPosition(0, 216);
+  setPosition(0, 288);
+ 
+  // changes the colour of background every 10 cycles
+  // this will be delayed if something in loop is blocking
+  if (ledsCounter < 10) {
+    ledsCounter++;
+  } else {
+    currentColor.hue = (currentColor.hue + 1) % 256;
+    ledsCounter = 0;
+  }
+  ledsDisplayColor(currentColor);
 
 }
 
-// new angle (in degrees) - wip
+// newRadius (range TODO), newAngle (in degrees)
 void setPosition(float newRadius, float newAngle) {
-
-  const float newAngleToPosition = newAngle * (STEPS_PER_REVOLUTION / 360);
-  angleStepper.moveTo(newAngleToPosition); 
-
-  // trig to convert new radius to angle and radius position
-  const int A_LENGTH = 0; // something
-  const int B_LENGTH = 0; // something
+  // make sure that newRadius and newAngle is within min/max
+//  if (newRadius < 0){
+//    newAngle = newAngle+PI;
+//    newRadius = abs(newRadius);
+//  }
   
+  long newPositions[2]; // Array of desired stepper positions
+
+  // warning - because of mod, this might not be accounting for the scenario where it needs to cross from 359 degrees to 1 degree
+  const float newAngleToStepperPosition = (newAngle % 360) * (STEPS_PER_REVOLUTION / 360);
+  newPositions[0] = 100; // ignore radius for now
+  newPositions[1] = newAngleToStepperPosition;
+
+  // TODO trig to convert new radius to angle and radius position
+//  const int A_LENGTH = 0; // something
+//  const int B_LENGTH = 0; // something
+
+  // set target positions. new speeds will be computed for each stepper
+  // so they arrive at their respective targets at very close to the same time. 
+  steppers.moveTo(positions);
+  // not sure if blocking. documentation does not mention it, but example says it is blocking
+  steppers.runSpeedToPosition();
+
+  // update current radius and angle
+  currentRadius = newRadius;
+  currentAngle = newAngle;
 }
 
 /************************** Helpers ***********************************/
