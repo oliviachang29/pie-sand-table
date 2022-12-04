@@ -1,13 +1,10 @@
-/************************** Configuration ***********************************/
-// LIBRARIES
+/************************** Libraries ***********************************/
 #include <Wire.h>
-#include <Adafruit_MotorShield.h>
-#include <AccelStepper.h> // required to run multiple steppers
-
-//#include "utility/Adafruit_PWMServoDriver.h"
-
-// PIN DEFINITIONS
-const int PIN_LIMIT_SWITCH = 8;
+#include <AccelStepper.h> // required to run multiple steppers at the same time
+// Use MultiStepper class to manage multiple steppers and make them all move to 
+// the same position at the same time for linear 2d (or 3d) motion.
+#include <MultiStepper.h>
+#include <FastLED.h>
 
 /************************** Variables ***********************************/
 
@@ -29,31 +26,11 @@ float currentAngle = 0;
     "Microstepping" is a method where the coils are PWM'd to create smooth motion between steps.
 */
 
+AccelStepper angleStepper(AccelStepper::FULL4WIRE, 2, 3, 4, 5);
+AccelStepper radiusStepper(AccelStepper::FULL4WIRE, 8, 9, 10, 11);
 
-Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-// M1 and M2 is port 1
-Adafruit_StepperMotor *angleMotor = AFMS.getStepper(STEPS_PER_REVOLUTION, 1);
-// M1 and M2 is port 2
-Adafruit_StepperMotor *radiusMotor = AFMS.getStepper(STEPS_PER_REVOLUTION, 2);
-
-void angle_forwardStep() {
-  angleMotor->onestep(FORWARD, SINGLE);
-}
-
-void angle_backwardsStep() {
-  angleMotor->onestep(BACKWARD, SINGLE);
-}
-
-void radius_forwardStep() {
-  radiusMotor->onestep(FORWARD, SINGLE);
-}
-
-void radius_backwardsStep() {
-  radiusMotor->onestep(BACKWARD, SINGLE);
-}
-
-AccelStepper angleStepper(angle_forwardStep, angle_backwardsStep);
-AccelStepper radiusStepper(radius_forwardStep, radius_backwardsStep);
+// Up to 10 steppers can be handled as a group by MultiStepper
+MultiStepper steppers;
 
 /************************** Setup and Loop ***********************************/
 
@@ -61,16 +38,19 @@ void setup()
 {
   Serial.begin(9600);
   Serial.println("Starting sketch...");
-  AFMS.begin();
-
-  angleStepper.setSpeed(ANGLE_MOTOR_DEFAULT_SPEED);
-  angleStepper.moveTo(30);
-
-  radiusStepper.setSpeed(RADIUS_MOTOR_DEFAULT_SPEED);
-  radiusStepper.moveTo(30);
+  
+  // Configure each stepper
+  // todo make them constant
+  angleStepper.setMaxSpeed(500);
+  radiusStepper.setMaxSpeed(500);
+  
+  // use MultiStepper to manage both steppers
+  steppers.addStepper(angleStepper);
+  steppers.addStepper(radiusStepper);
 }
 
 void loop() {
+  /*
   // just moving back and forth
   // Change direction at the limits
   if (angleStepper.distanceToGo() == 0) {
@@ -87,6 +67,24 @@ void loop() {
   Serial.print(angleStepper.currentPosition());
   Serial.print("  radius: ");
   Serial.println(radiusStepper.currentPosition());
+  */
+
+  long positions[2]; // Array of desired stepper positions
+
+  Serial.println("pos 1");
+  positions[0] = 1000;
+  positions[1] = 50;
+  steppers.moveTo(positions);
+  steppers.runSpeedToPosition(); // Blocks until all are in position
+  delay(1000);
+
+  // Move to a different coordinate
+  Serial.println("pos 2");
+  positions[0] = -100;
+  positions[1] = 100;
+  steppers.moveTo(positions);
+  steppers.runSpeedToPosition(); // Blocks until all are in position
+  delay(1000);
 
 }
 
