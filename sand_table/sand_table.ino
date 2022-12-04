@@ -101,7 +101,6 @@ void testPositionMovement() {
 
 void loop() {
 //  testPositionMovement();
-
   setPosition(0, 0);
   setPosition(0, 72);
   setPosition(0, 144);
@@ -120,13 +119,43 @@ void loop() {
 
 }
 
+/************************** Helpers ***********************************/
+
+void printStepperPosition() {
+  Serial.print("angle s-pos: ");
+  Serial.print(angleStepper.currentPosition());
+  Serial.print(",  radius s-pos: ");
+  Serial.println(radiusStepper.currentPosition());
+}
+
+/* set current to motor pins low to prevent it from heating up when not in use
+ * per (stackoverflow link) 
+*/
+void setSteppersIdle() {
+  digitalWrite(2, LOW);
+  digitalWrite(3, LOW);
+  digitalWrite(4, LOW);
+  digitalWrite(5, LOW);
+  digitalWrite(8, LOW);
+  digitalWrite(9, LOW);
+  digitalWrite(10, LOW);
+  digitalWrite(11, LOW);
+}
+
 // newRadius (range TODO), newAngle (in degrees)
 void setPosition(float newRadius, float newAngle) {
+  Serial.print("newRadius: ");
+  Serial.print(newRadius);
+  Serial.print(",  newAngle: ");
+  Serial.println(newAngle);
+
+  printStepperPosition();
+  
   // make sure that newRadius and newAngle is within min/max
-//  if (newRadius < 0){
-//    newAngle = newAngle+PI;
-//    newRadius = abs(newRadius);
-//  }
+   if (newRadius < 0){
+     newAngle = newAngle+PI;
+     newRadius = abs(newRadius);
+   }
   
   long newPositions[2]; // Array of desired stepper positions
 
@@ -136,21 +165,22 @@ void setPosition(float newRadius, float newAngle) {
   newPositions[1] = newAngleToStepperPosition;
 
   // TODO trig to convert new radius to angle and radius position
-//  const int A_LENGTH = 0; // something
-//  const int B_LENGTH = 0; // something
+  //  const int A_LENGTH = 0; // something
+  //  const int B_LENGTH = 0; // something
 
   // set target positions. new speeds will be computed for each stepper
   // so they arrive at their respective targets at very close to the same time. 
   steppers.moveTo(positions);
   // not sure if blocking. documentation does not mention it, but example says it is blocking
+  // kind of only makes sense if it is blocking
   steppers.runSpeedToPosition();
+  // setSteppersIdle(); // TODO: uncomment if runSpeedToPosition is blocking
 
   // update current radius and angle
   currentRadius = newRadius;
   currentAngle = newAngle;
 }
 
-/************************** Helpers ***********************************/
 
 void debugAngle() {
   int input;
