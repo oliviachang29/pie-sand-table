@@ -7,8 +7,8 @@
 #include <FastLED.h>
 
 /************************** CONSTANTS ***********************************/
-#define LED_PIN 8                   // TODO change
-#define NUM_LEDS 41                 // TODO
+#define LED_PIN 7
+#define NUM_LEDS 39
 const int INITIAL_BRIGHTNESS = 128; // max brightness is 256
 
 const int STEPS_PER_REVOLUTION = 200;
@@ -32,8 +32,8 @@ int ledsCounter = 0;
 
 /************************** Motor Setup ***********************************/
 
-AccelStepper angleStepper(AccelStepper::FULL4WIRE, 2, 3, 4, 5);
-AccelStepper radiusStepper(AccelStepper::FULL4WIRE, 8, 9, 10, 11);
+AccelStepper angleStepper(AccelStepper::FULL2WIRE, 8, 9);
+AccelStepper radiusStepper(AccelStepper::FULL2WIRE, 10, 11);
 
 // Up to 10 steppers can be handled as a group by MultiStepper
 // necessary so that steppers.moveTo() can calculate the appropriate speeds
