@@ -17,8 +17,8 @@ const float STEPS_PER_REVOLUTION = 800.0;
 
 // say radius max is 50
 // as theta changes, adjust radius based on theta
-const float MAX_RADIUS = 50.0; // in mm, TODO
-const float THETA_STEP = 5.0; // arbitrary increase step
+const float MAX_RADIUS = 165.0; // in mm, TODO
+const float ANGLE_STEP = 2.0; // arbitrary increase step
 
 /************************** VARIABLES ***********************************/
 float currentRadius = 0;
@@ -70,32 +70,23 @@ void setup()
 
 void loop()
 {
-//   testPositionMovement();
-  //  testCircle();
-  setPosition(165.0 * sqrt(2), 0);
-  setPosition(0, 0);
+  currentAngle = currentAngle + ANGLE_STEP;
+  currentRadius = radiusFromAngle(currentAngle, 2); // todo, this can change
+  setPosition(currentRadius, currentAngle);
 
-  /*
-    // changes the colour of background LEDs every 10 cycles
-    // this will be delayed if something in loop is blocking
-    if (ledsCounter < 10)
-    {
-      ledsCounter++;
-    }
-    else
-    {
-      currentColor.hue = (currentColor.hue + 1) % 256;
-      ledsCounter = 0;
-    }
-    ledsDisplayColor(currentColor);
-  
-    // run pattern
-    // incremement angle from 0 to 360 with angle step
-    for (float theta = 0.0; theta < 360.0; theta = theta + ANGLE_STEP) {
-      const float newRadiusFromAngle = getRadiusFromAngle(theta, 0); // todo, this can change
-      setPosition(getRadiusFromAngle, theta);
-    }
-  */
+  // changes the colour of background LEDs every 10 cycles
+  // this will be delayed if something in loop is blocking
+  if (ledsCounter < 10)
+  {
+    ledsCounter++;
+  }
+  else
+  {
+    currentColor.hue = (currentColor.hue + 1) % 256;
+    ledsCounter = 0;
+  }
+  ledsDisplayColor(currentColor);
+
 }
 
 /************************** Patterns ***********************************/
@@ -112,15 +103,16 @@ float radiusFromAngle(float currentAngle, int patternType) {
     case 0:
       return radius_scale * MAX_RADIUS;
 //
-//    // SPIRAL
-//    // r = k * theta
-//    case 1:
-//      return spiral_scale * ((currentAngle % 360) / 360) * MAX_RADIUS;
-//
-//    // ROSE
-//    // r = a * cos(b * theta)
-//    case 2:
-//      return rose_scale * MAX_RADIUS * cos(rose_phase * currentAngle);      
+    // SPIRAL
+    // r = k * theta
+    case 1:
+    return radius_scale * MAX_RADIUS;
+//      return spiral_scale * ((currentAngle % 360.0) / 360.0) * MAX_RADIUS;
+
+    // ROSE
+    // r = a * cos(b * theta)
+    case 2:
+      return rose_scale * MAX_RADIUS * cos(rose_phase * currentAngle);      
 
     default:
       return radius_scale * MAX_RADIUS;
@@ -174,67 +166,45 @@ void setPosition(float newRadius, float newAngle)
   // QUESTION: Does the stepper motor position reset to zero after one revolution or does it go to 201?
   // most likely just keeps increasing
 
-  // Serial.print("newRadius: ");
-  // Serial.print(newRadius);
-  // Serial.print(",  newAngle: ");
-  // Serial.println(newAngle);
-
-  // make sure that newRadius and newAngle is within min/max
-  // if (newRadius < 0)
-  // {
-  //   newAngle = newAngle + PI;
-  //   newRadius = abs(newRadius);
-  // }
-
   long newPositions[2]; // Array of desired stepper positions
-
-  // // warning - not accounting for the scenario where it needs to cross from 359 degrees to 1 degree
-  const float newAngleToStepperPosition = newAngle * (STEPS_PER_REVOLUTION / 360.0) * 5.0 / 2.0;
-
-  // // trig to convert new radius to angle and radius position
   const float A_LENGTH = 165.0; // length of wooden shaft
-  const float B_LENGTH = 165.0; // length of plastic shaft
 
+  const float newAngleRadians = newAngle * (PI / 180.0);
 
-  // newRadius: 0.00, inside_cos: -1.00, theta_AB: 3.14, theta_B: 3.14, newRadiusToStepperPosition: 1000.00angle s-pos: 0,  radius s-pos: 1000
+  const float theta1 = asinf(sqrt(1-pow(newRadius, 2)/(4*pow(A_LENGTH, 2)))) + newAngleRadians - PI / 2;
+  const float theta2 = asinf(newRadius*sin(theta1 - newAngleRadians)/A_LENGTH) - newAngleRadians;
+  const float newAngleToStepperPosition = theta1 * (STEPS_PER_REVOLUTION / (2.0*PI)) * 5.0 / 2.0;
+  const float newRadiusToStepperPosition = theta2 * (STEPS_PER_REVOLUTION / (2.0*PI)) * 5.0 / 2.0;
 
-  const float inside_cos = (pow(newRadius, 2) - pow(A_LENGTH, 2) - pow(B_LENGTH, 2)) / (2.0 * A_LENGTH * B_LENGTH);
-
-  const float theta_AB = acosf(abs(inside_cos));
-  const float theta_B = theta_AB - (newAngle * 2.0 * PI / 360.0);
-  const float newRadiusToStepperPosition = theta_B * (STEPS_PER_REVOLUTION / (2.0 * PI)) * 5.0 / 2.0;
+  // debug prints, remove eventually
   Serial.print("newRadius: ");
   Serial.print(newRadius);
-  Serial.print(", inside_cos: ");
-  Serial.print(inside_cos);
-  Serial.print(", theta_AB: ");
-  Serial.print(theta_AB);
-  Serial.print(", theta_B: ");
-  Serial.print(theta_B);
-  Serial.print(", newRadiusToStepperPosition: ");
-  Serial.print(newRadiusToStepperPosition);
-
+  Serial.print(",  newAngle: ");
+  Serial.println(newAngle);
+  // Serial.print(", theta 1: ");
+  // Serial.print(theta1);
+  // Serial.print(", theta 2: ");
+  // Serial.print(theta2);
+  // Serial.print(", newRadiusToStepperPosition: ");
+  // Serial.print(newRadiusToStepperPosition);
+  // Serial.print(", newAngleToStepperPosition: ");
+  // Serial.print(newAngleToStepperPosition);
+  
   // set target positions. new speeds will be computed for each stepper
   // so they arrive at their respective targets at very close to the same time.
   newPositions[0] = newRadiusToStepperPosition;
   newPositions[1] = newAngleToStepperPosition;
 
   steppers.moveTo(newPositions);
-
-  // not sure if blocking. documentation does not mention it, but example says it is blocking
-  // kind of only makes sense if it is blocking
   steppers.runSpeedToPosition();
-  delay(2000);
   setSteppersIdle(); // TODO: comment if runSpeedToPosition is not blocking
-
+  // use blocking instead of 
+  delay(250);
   // printStepperPosition();
 
   // update current radius and angle
   currentRadius = newRadius;
   currentAngle = newAngle;
-
-  printStepperPosition();
-
 }
 
 /************************** Test/Debug ***********************************/
@@ -255,13 +225,12 @@ void testPositionMovement()
   positions[1] = 100;
   steppers.moveTo(positions);
   steppers.runSpeedToPosition();
-  delay(1000);
 }
 
 void testCircle() {
-  setPosition(0, 0);
-  setPosition(0, 72);
-  setPosition(0, 144);
-  setPosition(0, 216);
-  setPosition(0, 288);
+  setPosition(100, 0);
+  setPosition(100, 72);
+  setPosition(100, 144);
+  setPosition(100, 216);
+  setPosition(100, 288);
 }
