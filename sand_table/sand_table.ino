@@ -7,18 +7,15 @@
 #include <FastLED.h>
 
 /************************** CONSTANTS ***********************************/
+// LEDs
 const int LED_PIN = 7;
 const int NUM_LEDS = 39;
 const int INITIAL_BRIGHTNESS = 128; // max brightness is 256
 
 const float STEPS_PER_REVOLUTION = 800.0;
-
-// const float PI = 3.1415926535;
-
-// say radius max is 50
-// as theta changes, adjust radius based on theta
 const float MAX_RADIUS = 165.0; // in mm, TODO
-const float ANGLE_STEP = 2.0; // arbitrary increase step
+const float ANGLE_STEP = 5.0; // arbitrary increase step
+const float MAX_STEPPER_SPEED = 600;
 
 /************************** VARIABLES ***********************************/
 float currentRadius = 0;
@@ -49,8 +46,8 @@ void setup()
   // STEPPERS
   // Configure each stepper
   // todo make them constant and figure out ideal max speeds
-  angleStepper.setMaxSpeed(300);
-  radiusStepper.setMaxSpeed(300);
+  angleStepper.setMaxSpeed(MAX_STEPPER_SPEED);
+  radiusStepper.setMaxSpeed(MAX_STEPPER_SPEED);
 
   // use MultiStepper to manage both steppers
   // IMPORTANT: radius stepper needs to be added before angle
@@ -70,8 +67,12 @@ void setup()
 
 void loop()
 {
+  Serial.print("r: ");
+  Serial.print(currentRadius);
+  Serial.print(", theta: ");
+  Serial.println(currentAngle);
   currentAngle = currentAngle + ANGLE_STEP;
-  currentRadius = radiusFromAngle(currentAngle, 2); // todo, this can change
+  currentRadius = radiusFromAngle(currentAngle, 1);
   setPosition(currentRadius, currentAngle);
 
   // changes the colour of background LEDs every 10 cycles
@@ -93,7 +94,7 @@ void loop()
 
 float radiusFromAngle(float currentAngle, int patternType) {
   const float radius_scale = 0.5;
-  const float spiral_scale = 0.5;
+  const float spiral_scale = 0.2;
   const float rose_scale = 0.5;
   const float rose_phase = 2; // changes # of petals, non-integers look really cool
 
@@ -101,20 +102,38 @@ float radiusFromAngle(float currentAngle, int patternType) {
     // CIRCLE
     // just return default radius for circle
     case 0:
+      Serial.println("circle");
       return radius_scale * MAX_RADIUS;
 //
     // SPIRAL
     // r = k * theta
     case 1:
-    return radius_scale * MAX_RADIUS;
-//      return spiral_scale * ((currentAngle % 360.0) / 360.0) * MAX_RADIUS;
+    Serial.println("spiral");
+      float newRadius = spiral_scale * (currentAngle / 360.0) * 165.0;// * sqrt(2);
+      newRadius = float(int(newRadius)%(2*175));
+      if(newRadius > 175.0){
+        newRadius = 175.0 - (newRadius - 175.0);
+      }
+      return newRadius;
 
-    // ROSE
-    // r = a * cos(b * theta)
+
     case 2:
-      return rose_scale * MAX_RADIUS * cos(rose_phase * currentAngle);      
+      Serial.println("rose");
+      if (int(currentAngle) % 90 < 45) {
+        // MAX_RADIUS / (45 / ANGLE_STEP)
+        Serial.println(currentRadius + 15);
+        return currentRadius + 15;
+      } else {
+        return currentRadius - 15;
+      }
+//
+//    // ROSE
+//    // r = a * cos(b * theta)
+//    case 2:
+//      return rose_scale * MAX_RADIUS * cos(rose_phase * currentAngle);      
 
     default:
+    Serial.println("default");
       return radius_scale * MAX_RADIUS;
   }
 }
@@ -160,7 +179,6 @@ void setSteppersIdle()
 // newRadius (range TODO), newAngle (in degrees)
 void setPosition(float newRadius, float newAngle)
 {
-  // QUESTION: Does this take care of the case where it crosses over the zero position?
   // QUESTION: Do the stepper motor positions start at zero when they first get powered?
   // think so? have to test
   // QUESTION: Does the stepper motor position reset to zero after one revolution or does it go to 201?
@@ -180,15 +198,16 @@ void setPosition(float newRadius, float newAngle)
   Serial.print("newRadius: ");
   Serial.print(newRadius);
   Serial.print(",  newAngle: ");
-  Serial.println(newAngle);
-  // Serial.print(", theta 1: ");
-  // Serial.print(theta1);
-  // Serial.print(", theta 2: ");
-  // Serial.print(theta2);
-  // Serial.print(", newRadiusToStepperPosition: ");
-  // Serial.print(newRadiusToStepperPosition);
-  // Serial.print(", newAngleToStepperPosition: ");
-  // Serial.print(newAngleToStepperPosition);
+  Serial.print(newAngle);
+  Serial.print(", theta 1: ");
+  Serial.print(theta1);
+  Serial.print(", theta 2: ");
+  Serial.print(theta2);
+  Serial.print(", newRadiusToStepperPosition: ");
+  Serial.print(newRadiusToStepperPosition);
+  Serial.print(", newAngleToStepperPosition: ");
+  Serial.print(newAngleToStepperPosition);
+  printStepperPosition();
   
   // set target positions. new speeds will be computed for each stepper
   // so they arrive at their respective targets at very close to the same time.
@@ -196,10 +215,10 @@ void setPosition(float newRadius, float newAngle)
   newPositions[1] = newAngleToStepperPosition;
 
   steppers.moveTo(newPositions);
-  steppers.runSpeedToPosition();
-  setSteppersIdle(); // TODO: comment if runSpeedToPosition is not blocking
-  // use blocking instead of 
-  delay(250);
+  steppers.runSpeedToPosition(); // this is blocking
+
+  // setSteppersIdle();
+
   // printStepperPosition();
 
   // update current radius and angle
@@ -218,7 +237,7 @@ void testPositionMovement()
   positions[1] = 50;
   steppers.moveTo(positions);
   steppers.runSpeedToPosition();
-  delay(1000);
+  
 
   Serial.println("running to pos 2 (-100, 100)");
   positions[0] = -100;
@@ -233,4 +252,8 @@ void testCircle() {
   setPosition(100, 144);
   setPosition(100, 216);
   setPosition(100, 288);
+}
+
+void testStraightLine() {
+  
 }
